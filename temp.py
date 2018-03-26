@@ -20,16 +20,33 @@ pygame.mixer.init()
 rate, data = wave.read('/home/mael/Téléchargements/la_mono.wav')
 
 n=len(data)
+taille=int(len(data)/20)
 
-t=np.arange(len(data))/rate
-print(len(t))
+datap=data[0:taille]
 
-tfd= fft(data)
+t=np.arange(len(datap))/rate
+
+#print(len(t))
+
+tfd= fft(datap)
+
+print(len(tfd))
+
+plt.subplot(211)
+plt.plot(t,datap)
+
 spectre=np.absolute(tfd)*2/n
-freq=np.arange(n)*1.0/5
+freq=np.arange(taille)*1.0/5
 
-plt.plot(freq,spectre)
+#plt.plot(freq,spectre)
+
 #plt.figure(figsize=(30,4))
+for i in range(0,taille-2,2):
+    tfd[i]=tfd[i]-50000
+
+itfd=ifft(tfd)
+plt.subplot(212)
+plt.plot(t,itfd)
 #type(data[3])
 
 #plt.plot(t,y)
