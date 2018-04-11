@@ -1,0 +1,20 @@
+Etape 1:
+Correctement fractionner le son.
+
+Etape 2:
+Appliquer les correctes fenêtres au signal afin d'avoir le signal à traiter comme on le souhaite.
+
+Etape 3:
+Obtenir le spectre instantané du signal découpé.
+
+Etape 4: 
+Obtention de la réponse à court terme du conduit vocal.
+
+Etape 5:
+Calcul du spectre à court terme du son quelconque qui sera prononcé.
+
+Etape 6:
+Application de la réponse du conduit vocal au son à prononcer.
+
+Etape 7:
+Reconstitution du signal final.
