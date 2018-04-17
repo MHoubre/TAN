@@ -30,7 +30,10 @@ def sampling(sound,instant, width):
     cut = w*sample
     
     return cut
-    
+
+s=sampling(data,2*fe,fe)
+ts=np.arange(len(s))   
+plt.plot(ts,s)
 #echantillon = sample*w
 #plt.plot(t,datap)
 #plt.show()
