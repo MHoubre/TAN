@@ -1,15 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import wave
 import math
-import binascii
-import pygame
-from pygame.locals import *
 import scipy.io.wavfile as wave
 import scipy.signal as sig
 
-pygame.init()
-pygame.mixer.init()
 fe, data = wave.read('/home/mael/Téléchargements/la_mono.wav')
 
 n=len(data)
@@ -21,6 +15,8 @@ datap=data[0:taille]
 t=np.arange(len(datap))
 t=t/fe
 
+T=1*fe
+
 
 def sampling(sound,instant, width):
     w=sig.hanning(int(width)) #fenêtre de largeur width
@@ -31,9 +27,27 @@ def sampling(sound,instant, width):
     
     return cut
 
-s=sampling(data,2*fe,fe)
-ts=np.arange(len(s))   
-plt.plot(ts,s)
-#echantillon = sample*w
-#plt.plot(t,datap)
-#plt.show()
+s=sampling(data,2*fe,20000)
+#ts=np.arange(len(s))   
+#plt.plot(ts,s)
+samples=[]
+width=44100
+#print((len(data)/width)-2)
+
+
+#Fonction qui parcourt le morceau et le découpe.
+#arguments, morceau et nombre d'echantillons
+#samples number = (len/largeur_des_echantillons)-2
+def stocking_samples(sound, samples_number):
+    for i in range(samples_number+1):
+        samp=sampling(sound,i*fe,len(sound)/samples_number)
+        samples.append(samp)
+        
+    return samples
+    
+def short_term_transform(samples):
+    transform=[]
+    for i in range(len(samples+1)):
+        transform.append(np.fft(samples(i)))
+        
+    return transform
