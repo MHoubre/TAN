@@ -20,14 +20,15 @@ T=1*fe
 
 def sampling(sound,instant, width):
     w=sig.hanning(int(width)) #fenêtre de largeur width
-        
-    sample=sound[int((instant-(width/2))):int(instant+(width/2))]
+    cut=[]
+    print(width)
     
-    cut = w*sample
-    
+    if int(instant+(width/2)) >= len(sound) and int((instant-(width/2))) >=0 :    
+        sample=sound[int((instant-(width/2))):int(instant+(width/2))]
+        cut = w*sample
     return cut
 
-s=sampling(data,2*fe,20000)
+#s=sampling(data,2*fe,20000)
 #ts=np.arange(len(s))   
 #plt.plot(ts,s)
 samples=[]
@@ -39,12 +40,18 @@ width=44100
 #arguments, morceau et nombre d'echantillons
 #samples number = (len/largeur_des_echantillons)-2
 def stocking_samples(sound, samples_number):
-    for i in range(samples_number+1):
-        samp=sampling(sound,i*fe,len(sound)/samples_number)
+    for i in range(1,samples_number):
+        #print(int(len(sound)/samples_number))
+        samp=sampling(sound,(i/samples_number)*fe,int(len(sound)/samples_number))
         samples.append(samp)
         
     return samples
-    
+#--------------------------------------------------------
+#test  
+#sample=stocking_samples(data,int((len(data)/107)))
+#print(len(sample))
+#---------------------------------------------------------------
+#samp=sampling(data,1*fe,1000)
 def short_term_transform(samples):
     transform=[]
     for i in range(len(samples+1)):
