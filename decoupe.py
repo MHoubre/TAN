@@ -3,10 +3,12 @@ import numpy as np
 import math
 import scipy.io.wavfile as wave
 import scipy.signal as sig
+from scipy import fft, ifft
 
 fe, data = wave.read('/home/mael/Téléchargements/la_mono.wav')
 
 n=len(data)
+print(n)
 taille=int(len(data)/10)
 
 
@@ -23,7 +25,7 @@ def sampling(sound,instant, width):
     cut=[]
     if int(instant+(width/2)) < len(sound) and int((instant-(width/2))) >=0 :    
         sample=sound[int((instant-(width/2))):int(instant+(width/2))]
-        print(len(sample))
+#        print(len(sample))
         cut = w*sample
     return cut
 
@@ -46,13 +48,16 @@ def stocking_samples(sound, samples_number):
     return samples
 #--------------------------------------------------------
 #test  
-sample=stocking_samples(data,2048)
+sample=stocking_samples(data,2041)
 #print(len(sample))
 #---------------------------------------------------------------
 #samp=sampling(data,1*fe,1000)
 def short_term_transform(samples):
     transform=[]
-    for i in range(len(samples+1)):
-        transform.append(np.fft(samples(i)))
+    for i in range(len(samples)):
+        #tr= np.asarray(samples[i])
+        transform.append(np.fft.fft(samples[i],2048))
         
     return transform
+    
+transf= short_term_transform(sample)
