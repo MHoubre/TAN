@@ -11,16 +11,18 @@ import numpy as np
 #liste v[n] reconstruite.
 def reconst(V, n, pas):
    #On commence par calculer les découpes :
-   #a=np.fft.ifftn(V)
-   #PAS POSSIBLE CAR ON NE PREND PAS EN COMPTE Q+N/2 DANS LE CALCUL DE IDFT
    L=len(V)
    l=len(V[0])
-   a=np.zeros((L,l)) #Construit une matrice vide de mêmes dimensions que V
+   a=np.zeros((L,l), dtype=complex) #Construit une matrice vide de mêmes dimensions que V
+   for i in range(0,L): #Pour chaque ligne (=pour chaque tranche)
+      a[i]=np.fft.ifftn(V[i])
    
    #Puis on reconstruit le signal :
    v=np.zeros(n)
-   for i in range(0, n-1):
+   for i in range(0, n):
        m = int(i/pas)
-       q = i-m*pas
+       print(m)
+       q = int(i-m*pas)
+       print(q)
        v[i] = a[m,q] + a[m+1, q-pas]
-   return 
+   return v
