@@ -40,7 +40,7 @@ width=44100
 #arguments, morceau et nombre d'echantillons
 #samples number = (len/largeur_des_echantillons)-2
 def stocking_samples(sound, samples_number):
-    for i in range(1,samples_number):
+    for i in range(1,samples_number+1):
         #print(int(len(sound)/samples_number))
         samp=sampling(sound,(i/samples_number)*fe,int(len(sound)/samples_number))
         samples.append(samp)
@@ -48,8 +48,8 @@ def stocking_samples(sound, samples_number):
     return samples
 #--------------------------------------------------------
 #test  
-#sample=stocking_samples(data,int((len(data)/107)))
-#print(len(sample))
+sample=stocking_samples(data,2048)
+print(len(sample))
 #---------------------------------------------------------------
 #samp=sampling(data,1*fe,1000)
 def short_term_transform(samples):
