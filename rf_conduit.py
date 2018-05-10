@@ -73,7 +73,7 @@ def callback(indata, outdata, frames, time, status):
 
 
 if __name__ == "__main__":
-     fe, soundarray = wave.read('test_voix.wav')
+     fe, soundarray = wave.read('0838.wav')
      print(fe)
 
      with sd.Stream(channels=1, callback=callback, blocksize=N, device=(0, 9)):
