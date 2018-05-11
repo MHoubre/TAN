@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.io.wavfile as wave
 import scipy.signal as sig
+
 import sounddevice as sd
 
 from matplotlib import pyplot as plt
@@ -32,9 +33,8 @@ def vocal_frequency_response_estimation(samples):
         a = np.log(np.absolute(s)) #erreur normales ici
         a[a == -np.inf] = 0
         ck = np.fft.ifft(a)
-        #plt.plot(ck)
-        #plt.show()
-        ck = [f if np.absolute(f) < 0.4 else 0 for f in ck] #va un peu plus vite qu'une boucle, seuil à parametrer
+    #    ck[np.absolute(ck) >= 0.5] = 0
+        #ck = [f if np.absolute(f) < 0.4 else 0 for f in ck]
         Ck = np.fft.fft(ck)
         Hk = np.exp(Ck)
         H.append(Hk)
@@ -44,13 +44,21 @@ def apply_vocal_spectrum(E, H):
     V = []
 
     for i in range(len(E)):
-        V.append(E[i] * H[i])
+        if(len(H) > 1):
+            V.append(E[i] * H[i])
+        else:
+            V.append(E[i] * H[i])
 
     return V
 
 def apply_transformation(voice, sound):
-    data = voice[0:len(sound)]
-    sound = sound[0:len(data)]
+    ls = len(sound)
+    lv = len(voice)
+
+    if (ls < lv):
+        sound = np.pad(sound, (0, lv-ls), 'reflect')
+    else:
+        sound = sound[:len(voice)]
 
     fv, tv, zv = sig.stft(voice, nperseg=N)
     fs, ts, zs = sig.stft(sound, nperseg=N)
@@ -58,52 +66,70 @@ def apply_transformation(voice, sound):
     H = vocal_frequency_response_estimation(zv)
     V = apply_vocal_spectrum(zs, H)
 
-    t, R = sig.istft(V)
+    t, R = sig.istft(V, nperseg=N)
 
     return R
 
+
 def callback(indata, outdata, frames, time, status):
-    if status:
-        print(status)
-    print(len(indata))
-    print(indata)
-    outdata[:] = indata
-    #outdata[:] = apply_transformation(indata, soundarray)
+    outdata[:, 0] = apply_transformation(indata[:, 0], soundarray)/100
+
+def plot(voice, soundarray, output):
+
+    plt.subplot(231)
+    plt.plot(voice)
+    plt.subplot(232)
+    plt.plot(soundarray)
+    plt.subplot(233)
+    plt.plot(output)
+
+    plt.subplot(234)
+    plt.plot(np.fft.fftshift(np.fft.fft(voice)))
+    plt.subplot(235)
+    plt.plot(np.fft.fftshift(np.fft.fft(soundarray)))
+    plt.subplot(236)
+    plt.plot(np.fft.fftshift(np.fft.fft(output)))
+    plt.show()
+
+    #plt.plot(output, label)
 
 
+def stream(sec, k):
+    with sd.Stream(channels=1, callback=callback, blocksize=N*k, device=(5,5)):
+          sd.sleep(int(sec * 1000))
+
+def test_sound(v_path, output=None):
+    global soundarray
+    fe, voice = wave.read(v_path)
+
+    try:
+        voice = voice[:, 0]
+    except IndexError:
+        pass
+
+    try:
+        soundarray = soundarray[:, 0]
+    except IndexError:
+        pass
+
+    sd.play(voice)
+    sd.wait()
+    sd.play(soundarray)
+    sd.wait()
+
+    R = apply_transformation(voice, soundarray)
+    R = R / 100000
+
+    if (output is None):
+        sd.play(R)
+        sd.wait()
+    else:
+        wave.write("output.wav", fe, R)
 
 if __name__ == "__main__":
-     fe, soundarray = wave.read('0838.wav')
-     print(fe)
+    #fe, soundarray = wave.read('sons/feu.wav')
+    #fe, voice = wave.read('lepadawan.wav')
+    soundarray = wave.read('sons/vent1.wav')[1]
 
-     with sd.Stream(channels=1, callback=callback, blocksize=N, device=(0, 9)):
-         sd.sleep(int(20 * 1000))
-
-#     fe2, la = wave.read('0838.wav')
-# #    print(n, fe)
-#     la = la[0:len(data)]
-#     data = data[0:len(la)]
-#     f, t, Zxx = sig.stft(data, nperseg=2048) #partie 1 :/
-#     f2, t2, E = sig.stft(la, nperseg=2048)
-#
-#     H = vocal_frequency_response_estimation(Zxx)
-#
-#     V = apply_vocal_spectrum(E, H)
-#
-#     t, R = sig.istft(V) # partie reconstruction :/
-#
-#     R = R / 100000 #On devra peut etre appliquer un facteur
-#
-#     wave.write("chasse-eau-baptiste.wav", fe, R)
-    # plt.plot(data)
-    # plt.figure()
-    # plt.plot(H[10])
-    # plt.figure()
-    # plt.plot(R)
-    # plt.show()
-    # sd.play(data)
-    # sd.wait()
-    # sd.play(la)
-    # sd.wait()
-    # sd.play(R)
-    # sd.wait()
+    test_sound('lepadawan.wav')
+    stream(30, 8)
