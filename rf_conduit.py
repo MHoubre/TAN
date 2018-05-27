@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import numpy as np
 import scipy.io.wavfile as wave
 import scipy.signal as sig
@@ -8,48 +10,107 @@ from matplotlib import pyplot as plt
 from reconstruct import reconst
 
 
-N=2048
+N = 2048
+fe = 44100
+T = N / fe
+
+sd.default.samplerate = fe
+sd.default.channels = 1
+
 soundarray = None
 
-#
-# def tf_short_term(data, N):
-#     hw = sig.hanning(N)
-#
-#     indices = np.arange(start=0, stop=len(data), step=N, dtype='int')
-#     samples = []
-#     for i in indices:
-#         s = data[i:i+N]
-#         l = len(s)
-#         if l < N: #le dernier echantillon est tronqué on recalcule la bonne
-#                   #taille de fenetre
-#             hw = sig.hanning(l)
-#         samples.append(np.fft.fft(data[i:i+N]*hw, N))
-#
-#     return samples
 
-def vocal_frequency_response_estimation(samples):
-    H = []
-    for s in samples:
-        a = np.log(np.absolute(s)) #erreur normales ici
-        a[a == -np.inf] = 0
-        ck = np.fft.ifft(a)
-    #    ck[np.absolute(ck) >= 0.5] = 0
-        #ck = [f if np.absolute(f) < 0.4 else 0 for f in ck]
-        Ck = np.fft.fft(ck)
-        Hk = np.exp(Ck)
-        H.append(Hk)
+def plot_fft(tf, N=N):
+    #fonction pour tracer une fft
+    xf = np.linspace(0.0, 1.0/(2.0*T), N//2)
+    plt.plot(xf, 2.0/N * np.abs(tf[0:N//2]))
+    plt.grid()
+    plt.show()
+
+def tf_short_time(x):
+    #Scipy génère bien w(s) = hann(s) pour 0 <= s <= N-1
+    #on l'appliquera ensuite à chaque découpe
+    hw = sig.hann(N)
+
+    length = x.size #longueur du signal
+
+    #Calcule des indices selon une découpe de pas N/2
+    #indices = np.arange(start=0, stop=length - N/2, step=N/2, dtype='int')
+    indices = np.arange(start=0, stop=length, step=N/2, dtype='int')
+
+    #Echantillons en sortie
+    samples = np.zeros((indices.size, N), dtype='complex')
+
+    for m, i in enumerate(indices):
+        #Notre échantillon de taile N:
+        s = x[i:i+N]
+        l = len(s) #sa longeur
+        if l < N: #dernier echantillon tronqué
+            s = np.pad(s, (0, N-l), 'constant') #zero-padding
+            #hw = sig.hann(l) #recalcul de la fenêtre
+
+        #Echantillon fenétré:
+        sw = s * hw
+        #Calcul de la TF de l'échantillon:
+        tf = np.fft.fft(sw)
+        #plot_fft(tf)
+        samples[m] = tf
+
+    return samples
+
+
+def vocal_frequency_response_estimation(stf):
+
+    J_THRES = 30
+
+    H = np.zeros(stf.shape, dtype='complex')
+
+    for m in range(stf.shape[0]):
+
+        module = np.absolute(stf[m])
+
+        module = module + 0.001 #eviter log(0)
+        lm = np.log(module)
+
+        cesptre = np.fft.ifft(lm)
+
+        #filtrage du cesptre
+        for j in range(cesptre.size):
+            if j >= J_THRES and j <= N-J_THRES:
+                cesptre[j] = 0
+
+        #plot_fft(cesptre)
+
+        cexp = np.fft.fft(cesptre)
+        H[m] = np.exp(cexp)
+
     return H
 
 def apply_vocal_spectrum(E, H):
-    V = []
 
-    for i in range(len(E)):
-        if(len(H) > 1):
-            V.append(E[i] * H[i])
-        else:
-            V.append(E[i] * H[i])
+    V = np.zeros(E.shape, dtype='complex')
+
+    for m in range(V.shape[0]):
+        V[m] = E[m] * H[m]
+        #plot_fft(V[m])
 
     return V
+
+def reconstruct(V, nmax):
+    R = np.zeros(nmax)
+    a = np.zeros(V.shape)
+    dn = N/2
+
+    for m in range(V.shape[0]):
+        a[m] = np.fft.ifft(V[m])
+
+    print(nmax, a.shape)
+    for n in range(nmax-N):
+        m = int(n/dn)
+        q = int(n - m * dn)
+        print(m, q)
+        #R[n] = a[m, q] + a[m+1, int(q - N/2)]
+
 
 def apply_transformation(voice, sound):
     ls = len(sound)
@@ -60,19 +121,20 @@ def apply_transformation(voice, sound):
     else:
         sound = sound[:len(voice)]
 
-    fv, tv, zv = sig.stft(voice, nperseg=N)
-    fs, ts, zs = sig.stft(sound, nperseg=N)
+    tfs_voice = tf_short_time(voice)
+    tfs_sound = tf_short_time(sound)
 
-    H = vocal_frequency_response_estimation(zv)
-    V = apply_vocal_spectrum(zs, H)
+    H = vocal_frequency_response_estimation(tfs_voice)
+    V = apply_vocal_spectrum(tfs_sound, H)
 
-    t, R = sig.istft(V, nperseg=N)
+    R = reconstruct(V, ls)
 
     return R
 
 
 def callback(indata, outdata, frames, time, status):
-    outdata[:, 0] = apply_transformation(indata[:, 0], soundarray)/100
+    outdata[:] = indata
+    #outdata[:, 0] = apply_transformation(indata[:, 0], soundarray)/100
 
 def plot(voice, soundarray, output):
 
@@ -95,7 +157,7 @@ def plot(voice, soundarray, output):
 
 
 def stream(sec, k):
-    with sd.Stream(channels=1, callback=callback, blocksize=N*k, device=(5,5)):
+    with sd.Stream(callback=callback, blocksize=N*k, device=(0,0)):
           sd.sleep(int(sec * 1000))
 
 def test_sound(v_path, output=None):
@@ -112,24 +174,24 @@ def test_sound(v_path, output=None):
     except IndexError:
         pass
 
-    sd.play(voice)
-    sd.wait()
-    sd.play(soundarray)
-    sd.wait()
+    #sd.play(voice, blocking=True)
+    #sd.play(soundarray, blocking=True)
 
     R = apply_transformation(voice, soundarray)
-    R = R / 100000
-
+    #R = R / 100000
     if (output is None):
-        sd.play(R)
-        sd.wait()
-    else:
-        wave.write("output.wav", fe, R)
+         #sd.play(R[0])
+         sd.wait()
+    # else:
+    #     wave.write("output.wav", fe, R)
+
+def record(path, sec):
+    a = sd.rec(4*fe, blocking=True)
+    wave.write(path, fe, a)
 
 if __name__ == "__main__":
-    #fe, soundarray = wave.read('sons/feu.wav')
-    #fe, voice = wave.read('lepadawan.wav')
+    #sd.wait()
     soundarray = wave.read('sons/vent1.wav')[1]
-
-    test_sound('lepadawan.wav')
-    stream(30, 8)
+    #sd.play(soundarray, blocking=True)
+    test_sound('voix/do.wav')
+    #sstream(30, 8)
