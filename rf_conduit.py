@@ -20,10 +20,13 @@ sd.default.channels = 1
 soundarray = None
 
 
-def plot_fft(tf, N=N):
+def plot_fft(s, tf, N=N):
     #fonction pour tracer une fft
-    xf = np.linspace(0.0, 1.0/(2.0*T), N//2)
-    plt.plot(xf, 2.0/N * np.abs(tf[0:N//2]))
+    #xf = np.linspace(0.0, 1.0/(2.0*T), N//2)
+    #plt.plot(xf, 2.0/N * np.abs(tf[0:N//2]))
+
+    freq = np.fft.fftfreq(s.size, d=1/fe)
+    plt.plot(freq[0:N//2], np.abs(tf[0:N//2]))
     plt.grid()
     plt.show()
 
@@ -51,9 +54,12 @@ def tf_short_time(x):
 
         #Echantillon fenétré:
         sw = s * hw
+
         #Calcul de la TF de l'échantillon:
         tf = np.fft.fft(sw)
-        #plot_fft(tf)
+
+        #plot_fft(sw, tf)
+
         samples[m] = tf
 
     return samples
@@ -61,25 +67,32 @@ def tf_short_time(x):
 
 def vocal_frequency_response_estimation(stf):
 
-    J_THRES = 30
+    TETA_THRES = 800
 
     H = np.zeros(stf.shape, dtype='complex')
 
     for m in range(stf.shape[0]):
 
-        module = np.absolute(stf[m])
+        module = np.abs(stf[m])
 
         module = module + 0.001 #eviter log(0)
         lm = np.log(module)
 
         cesptre = np.fft.ifft(lm)
 
+        #plot_fft(lm, cesptre)
+
+        freq = np.fft.fftfreq(cesptre.size, d=1/fe)
+
         #filtrage du cesptre
         for j in range(cesptre.size):
-            if j >= J_THRES and j <= N-J_THRES:
+            f = np.abs(freq[j])
+            fN = freq[N-1]
+
+            if f >= TETA_THRES:
                 cesptre[j] = 0
 
-        #plot_fft(cesptre)
+        #plot_fft(lm, cesptre)
 
         cexp = np.fft.fft(cesptre)
         H[m] = np.exp(cexp)
@@ -99,18 +112,21 @@ def apply_vocal_spectrum(E, H):
 def reconstruct(V, nmax):
     R = np.zeros(nmax)
     a = np.zeros(V.shape)
-    dn = N/2
+    dn = N // 2
+
 
     for m in range(V.shape[0]):
         a[m] = np.fft.ifft(V[m])
 
-    print(nmax, a.shape)
-    for n in range(nmax-N):
-        m = int(n/dn)
-        q = int(n - m * dn)
-        print(m, q)
-        #R[n] = a[m, q] + a[m+1, int(q - N/2)]
+    #print(nmax, a.shape)
 
+    for n in range(nmax-N):
+        m = n // dn
+        q = int(n - m * dn)
+        #print(m, q + dn, q)
+        R[n] = a[m, q] + a[m+1, q+dn]
+
+    return R
 
 def apply_transformation(voice, sound):
     ls = len(sound)
@@ -127,14 +143,15 @@ def apply_transformation(voice, sound):
     H = vocal_frequency_response_estimation(tfs_voice)
     V = apply_vocal_spectrum(tfs_sound, H)
 
-    R = reconstruct(V, ls)
+    R = reconstruct(V, lv)
 
-    return R
+    return R / 100000
 
 
 def callback(indata, outdata, frames, time, status):
-    outdata[:] = indata
-    #outdata[:, 0] = apply_transformation(indata[:, 0], soundarray)/100
+    #outdata[:] = indata
+    outdata[:, 0] = apply_transformation(indata[:, 0], soundarray)
+
 
 def plot(voice, soundarray, output):
 
@@ -157,22 +174,21 @@ def plot(voice, soundarray, output):
 
 
 def stream(sec, k):
-    with sd.Stream(callback=callback, blocksize=N*k, device=(0,0)):
-          sd.sleep(int(sec * 1000))
+    with sd.Stream(callback=callback, blocksize=N*k):
+        sd.sleep(int(sec * 1000))
 
-def test_sound(v_path, output=None):
+def test_sound(v_path=None, output=None, data=None):
     global soundarray
-    fe, voice = wave.read(v_path)
+    if data is None:
+        voice = wave.read(v_path)[1]
+    else:
+        voice = data
 
     try:
         voice = voice[:, 0]
     except IndexError:
         pass
 
-    try:
-        soundarray = soundarray[:, 0]
-    except IndexError:
-        pass
 
     #sd.play(voice, blocking=True)
     #sd.play(soundarray, blocking=True)
@@ -180,7 +196,7 @@ def test_sound(v_path, output=None):
     R = apply_transformation(voice, soundarray)
     #R = R / 100000
     if (output is None):
-         #sd.play(R[0])
+         sd.play(R)
          sd.wait()
     # else:
     #     wave.write("output.wav", fe, R)
@@ -189,9 +205,18 @@ def record(path, sec):
     a = sd.rec(4*fe, blocking=True)
     wave.write(path, fe, a)
 
+    return a
+
 if __name__ == "__main__":
     #sd.wait()
     soundarray = wave.read('sons/vent1.wav')[1]
+
+    try:
+        soundarray = soundarray[:, 0]
+    except IndexError:
+        pass
     #sd.play(soundarray, blocking=True)
-    test_sound('voix/do.wav')
-    #sstream(30, 8)
+    a = record("test.wav", 4)
+    sd.play(a, blocking=True)
+    test_sound(data=a)
+    #stream(30, 8)
